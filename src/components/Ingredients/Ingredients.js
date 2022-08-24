@@ -1,59 +1,85 @@
-import React, { useCallback, useState } from 'react';
+import React, { useReducer, useCallback } from 'react';
 
 import IngredientForm from './IngredientForm';
 import IngredientList from './IngredientList';
 import Search from './Search';
 import ErrorModal from '../UI/ErrorModal';
 
+const ingredientsReducer = (currentIngredient,action)=>{
+  switch (action.type) {
+    case "SET":
+      return action.ingredients;
+    case "ADD":
+      return [...currentIngredient,action.ingredient];
+    case "DELETE":
+      return currentIngredient.filter(ig=> ig.id !== action.id);
+    default:
+      throw new Error("Error");
+  }
+}
+
+const alertsReducers = (currentState,action)=>{
+  switch (action.type) {
+    case "SEND":
+      return {...currentState,loading:true}
+    case "RESPONSE":
+      return {error:null,loading:false}
+    case "ERROR":
+      return {error:action.message,loading:false}
+    case "CLOSE":
+      return {error:null,loading:false}
+   
+    default:
+      break;
+  }
+}
+
 function Ingredients() {
 
-  const [userIngredients,setuserIngredients] = useState([]);
-  const [isLoading,setLoading] = useState(false);
-  const [error,setError] = useState("");
-
+  const [userIngredients, dispatch] = useReducer(ingredientsReducer, [])
+  const [alert, dispatchAlert] = useReducer(alertsReducers, {error:null,loading:false})
+  
   const filterChange = useCallback((filteredIngredients)=>{
-    setuserIngredients(filteredIngredients);
-  },[setuserIngredients]); 
+    dispatch({type:"SET",ingredients:filteredIngredients});
+  },[]); 
 
   const AddIngeredients = (ingredient)=>{
-    setLoading(true);
+    dispatchAlert({type:"SEND"});
     fetch("https://react-hooks-71b1e-default-rtdb.firebaseio.com/ingredients.json",{
       method:'POST',
       body:JSON.stringify(ingredient),
       headers:{'Content-Type' : 'application/json'}
     }).then(response => {
-      setLoading(false);
+      dispatchAlert({type:"RESPONSE"});
       return response.json();
     }).then(responseData => {
-      setuserIngredients(prev=>[...prev,{id:responseData.name,...ingredient}]);
+      dispatch({type:"ADD",ingredient:{id:responseData.name,...ingredient}})
     }).catch(err=>{
-      setError(err.message);
-      setLoading(false);
+      dispatchAlert({type:"ERROR", message:err.message});
     });
     
   }
   const removeItem = id=>{
-    setLoading(true);
+    
+    dispatchAlert({type:"SEND"});
     fetch(`https://react-hooks-71b1e-default-rtdb.firebaseio.com/ingredients/${id}.json`,{
       method:'DELETE',
     }).then(response => {
-      setLoading(false)
-      setuserIngredients(prev => prev.filter(ig=> ig.id !== id))
+      dispatchAlert({type:"RESPONSE"});
+      dispatch({type:"DELETE", id:id});
     }).catch(err=>{
-      setError(err.message);
-      setLoading(false);
+      dispatchAlert({type:"ERROR", message:err.message});
     });
   }
 
   const closeError= ()=>{
-    setError(null);
-    setLoading(false);
+    dispatchAlert({type:"CLOSE"});
   }
 
   return (
     <div className="App">
-      {error && <ErrorModal onClose={closeError}>{error}</ErrorModal>}
-      <IngredientForm isLoading={isLoading}  onAddIngredient={AddIngeredients}/>
+      {alert.error && <ErrorModal onClose={closeError}>{alert.error}</ErrorModal>}
+      <IngredientForm isLoading={alert.loading}  onAddIngredient={AddIngeredients}/>
 
       <section>
         <Search onFilter={filterChange} />
