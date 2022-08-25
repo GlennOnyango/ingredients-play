@@ -1,4 +1,4 @@
-import React, { useReducer, useCallback } from 'react';
+import React, { useReducer, useCallback, useMemo } from 'react';
 
 import IngredientForm from './IngredientForm';
 import IngredientList from './IngredientList';
@@ -43,7 +43,7 @@ function Ingredients() {
     dispatch({type:"SET",ingredients:filteredIngredients});
   },[]); 
 
-  const AddIngeredients = (ingredient)=>{
+  const AddIngeredients = useCallback((ingredient)=>{
     dispatchAlert({type:"SEND"});
     fetch("https://react-hooks-71b1e-default-rtdb.firebaseio.com/ingredients.json",{
       method:'POST',
@@ -58,8 +58,8 @@ function Ingredients() {
       dispatchAlert({type:"ERROR", message:err.message});
     });
     
-  }
-  const removeItem = id=>{
+  },[]);
+  const removeItem = useCallback(id=>{
     
     dispatchAlert({type:"SEND"});
     fetch(`https://react-hooks-71b1e-default-rtdb.firebaseio.com/ingredients/${id}.json`,{
@@ -70,11 +70,15 @@ function Ingredients() {
     }).catch(err=>{
       dispatchAlert({type:"ERROR", message:err.message});
     });
-  }
+  },[]);
 
   const closeError= ()=>{
     dispatchAlert({type:"CLOSE"});
   }
+
+  const ingredientsList = useMemo(()=>{
+    return <IngredientList ingredients={userIngredients} onRemoveItem={removeItem}/>
+  },[userIngredients,removeItem]);
 
   return (
     <div className="App">
@@ -84,7 +88,7 @@ function Ingredients() {
       <section>
         <Search onFilter={filterChange} />
         {/* Need to add list here! */}
-        {<IngredientList ingredients={userIngredients} onRemoveItem={removeItem}/> }
+        {ingredientsList}
       </section>
     </div>
   );
