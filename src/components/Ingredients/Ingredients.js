@@ -1,9 +1,10 @@
-import React, { useReducer, useCallback, useMemo } from 'react';
+import React, { useReducer, useCallback, useMemo, useEffect } from 'react';
 
 import IngredientForm from './IngredientForm';
 import IngredientList from './IngredientList';
 import Search from './Search';
 import ErrorModal from '../UI/ErrorModal';
+import useHttp from '../custom_hooks/http';
 
 const ingredientsReducer = (currentIngredient,action)=>{
   switch (action.type) {
@@ -18,62 +19,44 @@ const ingredientsReducer = (currentIngredient,action)=>{
   }
 }
 
-const alertsReducers = (currentState,action)=>{
-  switch (action.type) {
-    case "SEND":
-      return {...currentState,loading:true}
-    case "RESPONSE":
-      return {error:null,loading:false}
-    case "ERROR":
-      return {error:action.message,loading:false}
-    case "CLOSE":
-      return {error:null,loading:false}
-   
-    default:
-      break;
-  }
-}
+
 
 function Ingredients() {
 
   const [userIngredients, dispatch] = useReducer(ingredientsReducer, [])
-  const [alert, dispatchAlert] = useReducer(alertsReducers, {error:null,loading:false})
+  const {sendRequest, loading, data, error, reqIdenifire, reqExra, extraData, close} = useHttp(); 
+
+  useEffect(() => {
+    if(reqIdenifire === "Req_Add"){
+      dispatch({type:"ADD",ingredient:{id:data.name,...extraData}})
+    }else if(reqIdenifire === "Req_Delete"){
+      dispatch({type:"DELETE", id:reqExra});
+    }
+  }, [reqIdenifire,data,reqExra,extraData]);
   
   const filterChange = useCallback((filteredIngredients)=>{
     dispatch({type:"SET",ingredients:filteredIngredients});
   },[]); 
 
-  const AddIngeredients = useCallback((ingredient)=>{
-    dispatchAlert({type:"SEND"});
-    fetch("https://react-hooks-71b1e-default-rtdb.firebaseio.com/ingredients.json",{
-      method:'POST',
-      body:JSON.stringify(ingredient),
-      headers:{'Content-Type' : 'application/json'}
-    }).then(response => {
-      dispatchAlert({type:"RESPONSE"});
-      return response.json();
-    }).then(responseData => {
-      dispatch({type:"ADD",ingredient:{id:responseData.name,...ingredient}})
-    }).catch(err=>{
-      dispatchAlert({type:"ERROR", message:err.message});
-    });
+   const AddIngeredients = useCallback((ingredient)=>{
+    sendRequest("https://react-hooks-71b1e-default-rtdb.firebaseio.com/ingredients.json",
+                "POST",
+                JSON.stringify(ingredient),
+                null,
+                 "Req_Add",
+                 ingredient
+                 );
     
-  },[]);
+   },[sendRequest]);
+
   const removeItem = useCallback(id=>{
+    let url = `https://react-hooks-71b1e-default-rtdb.firebaseio.com/ingredients/${id}.json`;
+    sendRequest(url, 'DELETE', null, id, "Req_Delete");
     
-    dispatchAlert({type:"SEND"});
-    fetch(`https://react-hooks-71b1e-default-rtdb.firebaseio.com/ingredients/${id}.json`,{
-      method:'DELETE',
-    }).then(response => {
-      dispatchAlert({type:"RESPONSE"});
-      dispatch({type:"DELETE", id:id});
-    }).catch(err=>{
-      dispatchAlert({type:"ERROR", message:err.message});
-    });
-  },[]);
+  },[sendRequest]);
 
   const closeError= ()=>{
-    dispatchAlert({type:"CLOSE"});
+    close();
   }
 
   const ingredientsList = useMemo(()=>{
@@ -82,8 +65,8 @@ function Ingredients() {
 
   return (
     <div className="App">
-      {alert.error && <ErrorModal onClose={closeError}>{alert.error}</ErrorModal>}
-      <IngredientForm isLoading={alert.loading}  onAddIngredient={AddIngeredients}/>
+      {error && <ErrorModal onClose={closeError}>{error}</ErrorModal>}
+      <IngredientForm isLoading={loading}  onAddIngredient={AddIngeredients}/>
 
       <section>
         <Search onFilter={filterChange} />
